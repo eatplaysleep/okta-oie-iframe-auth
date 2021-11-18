@@ -33,8 +33,6 @@ export const AuthReducer = (state, action) => {
 		case 'SILENT_AUTH_START':
 			return _.merge({}, state, action?.payload, {
 				isLoadingLogin: true,
-				authModalIsVisible: false,
-				iFrameIsVisible: false,
 			});
 		case 'SILENT_AUTH_END':
 			return _.merge({}, state, action?.payload, {
@@ -62,6 +60,7 @@ export const AuthReducer = (state, action) => {
 
 		case 'GET_USER_SUCCESS':
 		case 'SILENT_AUTH_SUCCESS':
+		case 'SILENT_AUTH_CANCEL':
 		case 'LOGIN_SUCCESS':
 			delete state.tokenParams;
 			return _.merge({}, state, { isStale: true }, action?.payload, {

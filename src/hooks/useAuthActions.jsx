@@ -28,10 +28,10 @@ export const useAuthActions = () => {
 	const { authState, oktaAuth } = useOktaAuth();
 
 	const silentAuth = async (dispatch, options) => {
+		let { hasSession, authModalIsVisible } = options || {};
+
 		try {
 			let config = {};
-
-			let hasSession = options?.hasSession;
 
 			if (hasSession === undefined) {
 				console.debug('checking for existing Okta session...');
@@ -54,7 +54,7 @@ export const useAuthActions = () => {
 				config.redirectUri = `${window.location.origin}/login/callback`;
 			}
 
-			const { tokens } = await oktaAuth.token.getWithoutPrompt(config);
+			const { tokens } = (await oktaAuth.token.getWithoutPrompt(config)) || {};
 
 			if (tokens) {
 				await oktaAuth.tokenManager.setTokens(tokens);
@@ -63,13 +63,24 @@ export const useAuthActions = () => {
 				return getUser(oktaAuth, dispatch);
 			} else return;
 		} catch (error) {
-			throw new Error(error);
+			if (error?.errorCode === 'login_required') {
+				console.debug(error);
+				dispatch({ type: 'SILENT_AUTH_CANCEL' });
+				return iFrameAuth(dispatch, { authModalIsVisible });
+			} else {
+				throw new Error(error);
+			}
 		}
 	};
 
 	const iFrameAuth = async (dispatch, options) => {
 		try {
-			const { loginHint } = options || {};
+			const { authModalIsVisible, loginHint } = options || {};
+
+			if (!authModalIsVisible) {
+				console.debug('authModal is not visible, cancelling login');
+				return dispatch({ type: 'LOGIN_CANCEL' });
+			}
 
 			if (loginHint) {
 				console.debug('loginHint:', loginHint);
@@ -81,7 +92,7 @@ export const useAuthActions = () => {
 
 			const { authUrl, tokenParams } = await generateAuthUrl(oktaAuth);
 
-			console.log('authState:', authState);
+			console.debug('authState:', authState);
 
 			return dispatch({
 				type: 'LOGIN_AUTHORIZE',
@@ -94,7 +105,8 @@ export const useAuthActions = () => {
 
 	const login = async (dispatch, props) => {
 		try {
-			const { tokens, tokenParams } = props || {};
+			const { tokens, tokenParams, authModalIsVisible } = props || {};
+
 			const { authorizationCode, interaction_code } = tokenParams || {};
 
 			const isCodeExchange = authorizationCode || interaction_code || false;
@@ -141,9 +153,9 @@ export const useAuthActions = () => {
 				if (!hasSession) {
 					const loginHint = props?.loginhint;
 
-					return await iFrameAuth(dispatch, { loginHint });
+					return await iFrameAuth(dispatch, { loginHint, authModalIsVisible });
 				} else {
-					return await silentAuth(dispatch, { hasSession });
+					return await silentAuth(dispatch, { hasSession, authModalIsVisible });
 				}
 			}
 		} catch (error) {

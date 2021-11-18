@@ -35,7 +35,7 @@ export const AuthModal = props => {
 	useEffect(() => {
 		console.debug('authModalIsVisible:', authModalIsVisible);
 		if (authModalIsVisible) {
-			login(dispatch);
+			login(dispatch, { authModalIsVisible });
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [authModalIsVisible]);
@@ -43,6 +43,7 @@ export const AuthModal = props => {
 		if (tokenParams?.authorizationCode) {
 			return login(dispatch, {
 				tokenParams,
+				authModalIsVisible,
 			});
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
