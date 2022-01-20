@@ -59,7 +59,20 @@ export const AuthReducer = (state, action) => {
 				iFrameIsVisible: false,
 				authModalIsVisible: false,
 			});
-
+		case 'AUTHENTICATORS_REFRESH':
+			return _.merge({}, state, action?.payload, {
+				isLoadingAuthenticators: true,
+				isStaleAuthenticators: true,
+			});
+		case 'AUTHENTICATORS_REFRESH_SUCCESS':
+			return _.merge({}, state, action?.payload, {
+				isLoadingAuthenticators: false,
+				isStaleAuthenticators: false,
+			});
+		case 'AUTHENTICATORS_ENROLL_START':
+			return _.merge({}, state, action?.payload, {
+				isLoadingAuthenticators: true,
+			});
 		case 'GET_USER_SUCCESS':
 		case 'SILENT_AUTH_SUCCESS':
 		case 'LOGIN_SUCCESS':
@@ -68,9 +81,7 @@ export const AuthReducer = (state, action) => {
 				isLoadingLogin: false,
 			});
 		case 'SUCCESS':
-			return _.merge({}, state, action?.payload, {
-				isLoading: false,
-			});
+			return _.merge({}, state, action?.payload);
 		case 'LOGIN_CANCEL':
 			return _.merge({}, state, action?.payload, {
 				isLoadingLogin: false,

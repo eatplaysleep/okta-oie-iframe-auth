@@ -1,12 +1,29 @@
 /** @format */
 import { Fragment, useEffect, useState } from 'react';
 import { Container, Grid } from '@mui/material';
-import { Loader, Paper, Typography } from '../../components';
-import { useAuthState } from '../../providers';
+import {
+	Authenticators,
+	Claims,
+	Loader,
+	Paper,
+	Typography,
+} from '../../components';
+import { useAuthDispatch, useAuthState } from '../../providers';
+
+const ENV = process.env.NODE_ENV;
+const ORIGINS = process.env.REACT_APP_ORIGIN_ALLOW?.split(/, {0,2}/) || [];
 
 export const Profile = () => {
-	const { user, isLoadingProfile } = useAuthState();
+	const dispatch = useAuthDispatch();
+	const {
+		user,
+		isLoadingProfile,
+		isStaleAuthenticators,
+		isLoadingAuthenticators,
+	} = useAuthState();
 	const [profile, setProfile] = useState();
+	const [authenticators, setAuthenticators] = useState();
+	const [availableFactors, setAvailableFactors] = useState();
 
 	useEffect(() => {
 		const buildProfile = () => {
@@ -23,24 +40,92 @@ export const Profile = () => {
 			}
 
 			if (profile.length > 0) {
-				return profile.map(attribute => (
-					<Fragment key={attribute.key}>
-						<Grid item xs={6}>
-							<Typography gutterBottom>{attribute.key}</Typography>
-						</Grid>
-						<Grid item xs={6}>
-							<Typography gutterBottom>{attribute.value}</Typography>
-						</Grid>
-					</Fragment>
-				));
+				return <Claims data={profile} />;
 			} else return <></>;
+		};
+
+		const getAvailableFactors = () => {
+			let url = `${window.location.origin}/api/${user?.sub}/factors/catalog`;
+
+			return fetch(url)
+				.then(resp => {
+					return resp.json();
+				})
+				.then(resp => {
+					if (Array.isArray(resp) && resp.length > 0) {
+						setAvailableFactors(resp);
+					}
+					return resp;
+				});
 		};
 
 		if (user) {
 			console.log('building profile...');
 			setProfile(() => buildProfile());
+			getAvailableFactors();
 		}
 	}, [user]);
+
+	useEffect(() => {
+		const getAvailableFactors = () => {
+			let url = `${window.location.origin}/api/${user?.sub}/factors/catalog`;
+
+			return fetch(url)
+				.then(resp => {
+					return resp.json();
+				})
+				.then(resp => {
+					if (Array.isArray(resp) && resp.length > 0) {
+						setAvailableFactors(resp);
+					}
+					return resp;
+				});
+		};
+
+		if (user && isStaleAuthenticators) {
+			getAvailableFactors().then(() =>
+				dispatch({ type: 'AUTHENTICATORS_REFRESH_SUCCESS' })
+			);
+		}
+	}, [user, isStaleAuthenticators, dispatch]);
+
+	useEffect(() => {
+		if (availableFactors) {
+			setAuthenticators(() => <Authenticators data={availableFactors} />);
+		}
+	}, [availableFactors]);
+
+	useEffect(() => {
+		const responseHandler = ({ origin, data }) => {
+			if (ENV === 'production') {
+				const isAllowed = ORIGINS.includes(origin);
+
+				if (!isAllowed) {
+					return;
+				}
+			}
+
+			if (data?.type === 'onsuccess' && data?.result === 'success') {
+				return dispatch({ type: 'REFRESH_AUTHENTICATORS' });
+			}
+		};
+
+		const resolve = error => {
+			if (error) {
+				throw error;
+			}
+
+			console.debug('removing listener...');
+			window.removeEventListener('message', responseHandler);
+		};
+
+		if (isLoadingAuthenticators) {
+			console.debug('adding listener...');
+			window.addEventListener('message', responseHandler);
+		}
+
+		return () => resolve();
+	}, [isLoadingAuthenticators, dispatch]);
 
 	return (
 		<Fragment>
@@ -68,6 +153,17 @@ export const Profile = () => {
 							{isLoadingProfile && <Loader />}
 							{profile}
 						</Grid>
+					</Fragment>
+				</Paper>
+				<Paper
+					variant='outlined'
+					sx={{ my: { xs: 3, md: 6 }, p: { xs: 2, md: 3 } }}
+				>
+					<Fragment>
+						<Typography variant='h5' gutterBottom sx={{ mt: 2 }}>
+							AUTHENTICATORS
+						</Typography>
+						{authenticators}
 					</Fragment>
 				</Paper>
 			</Container>

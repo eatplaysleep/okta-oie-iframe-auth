@@ -21,7 +21,10 @@ export const AuthProvider = ({ children }) => {
 		if (!state?.user) {
 			return getUserInfo(oktaAuth).then(resp => {
 				if (resp?.isAuthenticated) {
-					return dispatch({ type: 'SUCCESS', payload: { ...resp } });
+					return dispatch({
+						type: 'SUCCESS',
+						payload: { ...resp, isLoading: false },
+					});
 				}
 			});
 		}
