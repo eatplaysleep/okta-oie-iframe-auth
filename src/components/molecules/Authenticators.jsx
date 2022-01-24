@@ -118,7 +118,7 @@ export const Authenticators = ({ factors }) => {
                 key={key}
                 alignItems='flex-start'
                 secondaryAction={
-                  <ListItemButton onClick={() => handleSetup(_id)}>{_id}</ListItemButton>
+                  <ListItemButton onClick={() => handleSetup(_id)}>{setupText}</ListItemButton>
                 }
               >
                 <ListItemText primary={name} />
