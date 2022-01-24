@@ -18,55 +18,55 @@ const oktaAuth = new OktaAuth(authConfig.oidc);
 oktaAuth.start();
 
 const App = () => {
-	const history = useHistory();
-	const restoreOriginalUri = async (_oktaAuth, originalUri) =>
-		history.replace(toRelativeUrl(originalUri || '/', window.location.origin));
-	const customAuthHandler = () => {
-		history.push('/');
-	};
+  const history = useHistory();
+  const restoreOriginalUri = async (_oktaAuth, originalUri) =>
+    history.replace(toRelativeUrl(originalUri || '/', window.location.origin));
+  const customAuthHandler = () => {
+    history.push('/');
+  };
 
-	return (
-		<ThemeProvider theme={Theme}>
-			<Seo />
-			<CssBaseline />
-			<Suspense fallback={<div>Loading...</div>}>
-				<Security
-					oktaAuth={oktaAuth}
-					restoreOriginalUri={restoreOriginalUri}
-					onAuthRequired={customAuthHandler}
-				>
-					<AuthProvider>
-						<AppNavBar />
-						<div>
-							<Switch>
-								{routes.map(route => {
-									if (route?.isSecure) {
-										return (
-											<SecureRoute
-												key={route.path}
-												path={route.path}
-												exact={route?.isExact ?? false}
-												component={route.component}
-											/>
-										);
-									} else {
-										return (
-											<Route
-												key={route.path}
-												path={route.path}
-												exact={route?.isExact ?? false}
-												component={route.component}
-											/>
-										);
-									}
-								})}
-							</Switch>
-						</div>
-					</AuthProvider>
-				</Security>
-			</Suspense>
-		</ThemeProvider>
-	);
+  return (
+    <ThemeProvider theme={Theme}>
+      <Seo />
+      <CssBaseline />
+      <Suspense fallback={<div>Loading...</div>}>
+        <Security
+          oktaAuth={oktaAuth}
+          restoreOriginalUri={restoreOriginalUri}
+          onAuthRequired={customAuthHandler}
+        >
+          <AuthProvider>
+            <AppNavBar />
+            <div>
+              <Switch>
+                {routes.map((route) => {
+                  if (route?.isSecure) {
+                    return (
+                      <SecureRoute
+                        key={route.path}
+                        path={route.path}
+                        exact={route?.isExact ?? false}
+                        component={route.component}
+                      />
+                    );
+                  } else {
+                    return (
+                      <Route
+                        key={route.path}
+                        path={route.path}
+                        exact={route?.isExact ?? false}
+                        component={route.component}
+                      />
+                    );
+                  }
+                })}
+              </Switch>
+            </div>
+          </AuthProvider>
+        </Security>
+      </Suspense>
+    </ThemeProvider>
+  );
 };
 
 export default App;

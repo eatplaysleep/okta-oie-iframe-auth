@@ -4,245 +4,241 @@ import { useOktaAuth } from '@okta/okta-react';
 import { getUserInfo as getUser } from '../utils';
 
 export const useAuthActions = () => {
-	const { authState, oktaAuth } = useOktaAuth();
+  const { authState, oktaAuth } = useOktaAuth();
 
-	const silentAuth = async (dispatch, options) => {
-		try {
-			let config = {};
+  const silentAuth = async (dispatch, options) => {
+    try {
+      let config = {};
 
-			let hasSession = options?.hasSession;
+      let hasSession = options?.hasSession;
 
-			if (hasSession === undefined) {
-				console.debug('checking for existing Okta session...');
+      if (hasSession === undefined) {
+        console.debug('checking for existing Okta session...');
 
-				hasSession = await oktaAuth.session.exists();
+        hasSession = await oktaAuth.session.exists();
 
-				console.debug('session:', hasSession);
-			}
+        console.debug('session:', hasSession);
+      }
 
-			if (!hasSession) {
-				dispatch({ type: 'SILENT_AUTH_END' });
-				return;
-			}
+      if (!hasSession) {
+        dispatch({ type: 'SILENT_AUTH_END' });
+        return;
+      }
 
-			dispatch({
-				type: 'SILENT_AUTH_START',
-			});
+      dispatch({
+        type: 'SILENT_AUTH_START',
+      });
 
-			if (!options) {
-				config.redirectUri = `${window.location.origin}/login/callback`;
-			}
+      if (!options) {
+        config.redirectUri = `${window.location.origin}/login/callback`;
+      }
 
-			const { tokens } = await oktaAuth.token.getWithoutPrompt(config);
+      const { tokens } = await oktaAuth.token.getWithoutPrompt(config);
 
-			if (tokens) {
-				await oktaAuth.tokenManager.setTokens(tokens);
+      if (tokens) {
+        await oktaAuth.tokenManager.setTokens(tokens);
 
-				dispatch({ type: 'SILENT_AUTH_SUCCESS' });
-				return getUser(oktaAuth, dispatch);
-			} else return;
-		} catch (error) {
-			throw new Error(error);
-		}
-	};
+        dispatch({ type: 'SILENT_AUTH_SUCCESS' });
+        return getUser(oktaAuth, dispatch);
+      } else return;
+    } catch (error) {
+      throw new Error(error);
+    }
+  };
 
-	const iFrameAuth = async (dispatch, options) => {
-		try {
-			const { loginHint } = options || {};
+  const iFrameAuth = async (dispatch, options) => {
+    try {
+      const { loginHint } = options || {};
 
-			if (loginHint) {
-				console.debug('loginHint:', loginHint);
-			}
+      if (loginHint) {
+        console.debug('loginHint:', loginHint);
+      }
 
-			console.debug('generating URL...');
+      console.debug('generating URL...');
 
-			dispatch({ type: 'LOGIN_START' });
+      dispatch({ type: 'LOGIN_START' });
 
-			const { authUrl, tokenParams } = await generateAuthUrl(oktaAuth);
+      const { authUrl, tokenParams } = await generateAuthUrl(oktaAuth);
 
-			console.log('authState:', authState);
+      console.log('authState:', authState);
 
-			return dispatch({
-				type: 'LOGIN_AUTHORIZE',
-				payload: { authUrl, tokenParams },
-			});
-		} catch (error) {
-			throw new Error(error);
-		}
-	};
+      return dispatch({
+        type: 'LOGIN_AUTHORIZE',
+        payload: { authUrl, tokenParams },
+      });
+    } catch (error) {
+      throw new Error(error);
+    }
+  };
 
-	const login = async (dispatch, props) => {
-		try {
-			const { tokens, tokenParams } = props || {};
-			const { authorizationCode, interaction_code } = tokenParams || {};
+  const login = async (dispatch, props) => {
+    try {
+      const { tokens, tokenParams } = props || {};
+      const { authorizationCode, interaction_code } = tokenParams || {};
 
-			const isCodeExchange = authorizationCode || interaction_code || false;
+      const isCodeExchange = authorizationCode || interaction_code || false;
 
-			if (isCodeExchange) {
-				console.log(tokenParams);
-				const response = await oktaAuth.token.exchangeCodeForTokens(
-					tokenParams
-				);
+      if (isCodeExchange) {
+        console.log(tokenParams);
+        const response = await oktaAuth.token.exchangeCodeForTokens(tokenParams);
 
-				if (!response?.tokens) {
-					return dispatch({
-						type: 'LOGIN_ERROR',
-						error: `No tokens in response. Something went wrong! [${response}]`,
-					});
-				}
+        if (!response?.tokens) {
+          return dispatch({
+            type: 'LOGIN_ERROR',
+            error: `No tokens in response. Something went wrong! [${response}]`,
+          });
+        }
 
-				await oktaAuth.tokenManager.setTokens(response.tokens);
+        await oktaAuth.tokenManager.setTokens(response.tokens);
 
-				await oktaAuth.authStateManager.updateAuthState();
+        await oktaAuth.authStateManager.updateAuthState();
 
-				return dispatch({ type: 'LOGIN_SUCCESS' });
-			} else if (oktaAuth.isLoginRedirect() || tokens) {
-				console.debug('handling Okta redirect...');
+        return dispatch({ type: 'LOGIN_SUCCESS' });
+      } else if (oktaAuth.isLoginRedirect() || tokens) {
+        console.debug('handling Okta redirect...');
 
-				dispatch({ type: 'LOGIN_REDIRECT' });
+        dispatch({ type: 'LOGIN_REDIRECT' });
 
-				await oktaAuth.storeTokensFromRedirect();
+        await oktaAuth.storeTokensFromRedirect();
 
-				oktaAuth.removeOriginalUri();
+        oktaAuth.removeOriginalUri();
 
-				await oktaAuth.authStateManager.updateAuthState();
+        await oktaAuth.authStateManager.updateAuthState();
 
-				return;
-			} else if (!authState?.isAuthenticated) {
-				console.debug('setting original uri...');
+        return;
+      } else if (!authState?.isAuthenticated) {
+        console.debug('setting original uri...');
 
-				oktaAuth.setOriginalUri(window.location.href);
+        oktaAuth.setOriginalUri(window.location.href);
 
-				console.debug('checking for existing Okta session...');
+        console.debug('checking for existing Okta session...');
 
-				const hasSession = await oktaAuth.session.exists();
+        const hasSession = await oktaAuth.session.exists();
 
-				console.debug('session:', hasSession);
+        console.debug('session:', hasSession);
 
-				if (!hasSession) {
-					const loginHint = props?.loginhint;
+        if (!hasSession) {
+          const loginHint = props?.loginhint;
 
-					return await iFrameAuth(dispatch, { loginHint });
-				} else {
-					return await silentAuth(dispatch, { hasSession });
-				}
-			}
-		} catch (error) {
-			if (dispatch) {
-				dispatch({ type: 'LOGIN_ERROR', error: error });
-			}
-			return console.error('login error:', error);
-		}
-	};
+          return await iFrameAuth(dispatch, { loginHint });
+        } else {
+          return await silentAuth(dispatch, { hasSession });
+        }
+      }
+    } catch (error) {
+      if (dispatch) {
+        dispatch({ type: 'LOGIN_ERROR', error: error });
+      }
+      return console.error('login error:', error);
+    }
+  };
 
-	const logout = (dispatch, postLogoutRedirect) => {
-		let config = {};
+  const logout = (dispatch, postLogoutRedirect) => {
+    let config = {};
 
-		if (postLogoutRedirect) {
-			config = { postLogoutRedirectUri: postLogoutRedirect };
-		}
+    if (postLogoutRedirect) {
+      config = { postLogoutRedirectUri: postLogoutRedirect };
+    }
 
-		console.info('executing logout...');
+    console.info('executing logout...');
 
-		localStorage.removeItem('user');
+    localStorage.removeItem('user');
 
-		return oktaAuth
-			.signOut(config)
-			.then(() => dispatch({ type: 'LOGOUT_SUCCESS' }));
-	};
+    return oktaAuth.signOut(config).then(() => dispatch({ type: 'LOGOUT_SUCCESS' }));
+  };
 
-	return {
-		getUser,
-		login,
-		logout,
-		silentAuth,
-	};
+  return {
+    getUser,
+    login,
+    logout,
+    silentAuth,
+  };
 };
 
-const generateAuthUrl = async sdk => {
-	try {
-		const tokenParams = await sdk.token.prepareTokenParams(),
-			{ issuer, authorizeUrl } = sdk.options || {};
+const generateAuthUrl = async (sdk) => {
+  try {
+    const tokenParams = await sdk.token.prepareTokenParams(),
+      { issuer, authorizeUrl } = sdk.options || {};
 
-		// Use the query params to build the authorize url
+    // Use the query params to build the authorize url
 
-		// Get authorizeUrl and issuer
-		const url = authorizeUrl ?? `${issuer}/v1/authorize`;
+    // Get authorizeUrl and issuer
+    const url = authorizeUrl ?? `${issuer}/v1/authorize`;
 
-		const authUrl = url + buildAuthorizeParams(tokenParams);
+    const authUrl = url + buildAuthorizeParams(tokenParams);
 
-		return { authUrl, tokenParams };
-	} catch (error) {
-		throw new Error(`Unable to generate auth url [${error}]`);
-	}
+    return { authUrl, tokenParams };
+  } catch (error) {
+    throw new Error(`Unable to generate auth url [${error}]`);
+  }
 };
-const buildAuthorizeParams = tokenParams => {
-	let params = {};
+const buildAuthorizeParams = (tokenParams) => {
+  let params = {};
 
-	const oAuthParamMap = {
-		clientId: 'client_id',
-		codeChallenge: 'code_challenge',
-		codeChallengeMethod: 'code_challenge_method',
-		display: 'display',
-		idp: 'idp',
-		idpScope: 'idp_scope',
-		loginHint: 'login_hint',
-		maxAge: 'max_age',
-		nonce: 'nonce',
-		prompt: 'prompt',
-		redirectUri: 'redirect_uri',
-		responseMode: 'response_mode',
-		responseType: 'response_type',
-		sessionToken: 'sessionToken',
-		state: 'state',
-		scopes: 'scope',
-	};
+  const oAuthParamMap = {
+    clientId: 'client_id',
+    codeChallenge: 'code_challenge',
+    codeChallengeMethod: 'code_challenge_method',
+    display: 'display',
+    idp: 'idp',
+    idpScope: 'idp_scope',
+    loginHint: 'login_hint',
+    maxAge: 'max_age',
+    nonce: 'nonce',
+    prompt: 'prompt',
+    redirectUri: 'redirect_uri',
+    responseMode: 'response_mode',
+    responseType: 'response_type',
+    sessionToken: 'sessionToken',
+    state: 'state',
+    scopes: 'scope',
+  };
 
-	for (const [key, value] of Object.entries(tokenParams)) {
-		let oAuthKey = oAuthParamMap[key];
+  for (const [key, value] of Object.entries(tokenParams)) {
+    let oAuthKey = oAuthParamMap[key];
 
-		if (oAuthKey) {
-			params[oAuthKey] = value;
-		}
-	}
+    if (oAuthKey) {
+      params[oAuthKey] = value;
+    }
+  }
 
-	params.response_mode = 'okta_post_message';
+  params.response_mode = 'okta_post_message';
 
-	params = removeNils(params);
+  params = removeNils(params);
 
-	return toQueryString(params);
-};
-
-const toQueryString = obj => {
-	let str = [];
-	if (obj) {
-		for (const [key, value] of Object.entries(obj)) {
-			if (value) {
-				let output;
-				if (typeof value === 'string') {
-					output = encodeURIComponent(value);
-				} else if (Array.isArray(value)) {
-					output = value.join('+');
-				}
-
-				str.push(key + '=' + output);
-			}
-		}
-	}
-	if (str.length) {
-		return '?' + str.join('&');
-	} else {
-		return '';
-	}
+  return toQueryString(params);
 };
 
-const removeNils = obj => {
-	let cleaned = {};
+const toQueryString = (obj) => {
+  let str = [];
+  if (obj) {
+    for (const [key, value] of Object.entries(obj)) {
+      if (value) {
+        let output;
+        if (typeof value === 'string') {
+          output = encodeURIComponent(value);
+        } else if (Array.isArray(value)) {
+          output = value.join('+');
+        }
 
-	for (const [key, value] of Object.entries(obj)) {
-		if (value) {
-			cleaned[key] = value;
-		}
-	}
-	return cleaned;
+        str.push(key + '=' + output);
+      }
+    }
+  }
+  if (str.length) {
+    return '?' + str.join('&');
+  } else {
+    return '';
+  }
+};
+
+const removeNils = (obj) => {
+  let cleaned = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (value) {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
 };

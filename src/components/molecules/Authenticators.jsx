@@ -1,89 +1,143 @@
 /** @format */
 
-import { Fragment } from 'react';
+import { React, Fragment, PropTypes } from 'globals.jsx';
+import { List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
 import {
-	List,
-	ListItem,
-	ListItemButton,
-	ListItemIcon,
-	ListItemText,
-} from '@mui/material';
-import { Lock } from '@mui/icons-material';
+  Apple,
+  CheckCircleOutline,
+  EmailOutlined,
+  Fingerprint,
+  LocalPhoneOutlined,
+  Lock,
+  SmsOutlined,
+} from '@mui/icons-material';
+import { useAuthDispatch } from 'providers';
 
-export const Authenticators = ({ data }) => {
-	const handleSetup = authenticatorId => {
-		const url = `${process.env.REACT_APP_OKTA_URL}/idp/authenticators/setup/${authenticatorId}?fromURI=http://localhost:3000`;
+export const Authenticators = ({ factors }) => {
+  const dispatch = useAuthDispatch();
 
-		window.open(url);
-	};
+  const handleSetup = (authenticatorId) => {
+    const url = `${process.env.REACT_APP_OKTA_URL}/idp/authenticators/setup/${authenticatorId}`;
 
-	return (
-		<List sx={{ width: '100%' }}>
-			{data?.map(
-				({
-					key,
-					userId,
-					name,
-					factorType,
-					provider,
-					enrollment,
-					status,
-					_embedded,
-					authenticator,
-				}) => {
-					const { phones } = _embedded || {};
-					const { id } = authenticator || {};
+    dispatch({ type: 'AUTHENTICATORS_ENROLL_START', payload: { factorEnrollUrl: url } });
+    // window.open(url);
+  };
 
-					let canEnroll = (id && status === 'NOT_SETUP') ?? false,
-						enrolledPhones = [],
-						setupText = 'Setup';
+  return (
+    <Fragment>
+      {factors?.map(
+        ({
+          key,
+          _id,
+          name,
+          factorType,
+          provider,
+          enrollment,
+          status,
+          _embedded,
+          authenticators,
+        }) => {
+          let enrolledAuthenticators = [],
+            setupText = 'Setup';
 
-					if (Array.isArray(phones) && phones.length > 0) {
-						phones?.forEach(phone => {
-							const {
-								profile: { phoneNumber },
-								status,
-							} = phone;
+          if (authenticators.length > 0) {
+            authenticators.forEach((authenticator) => {
+              const { profile, name, type } = authenticator;
 
-							if (status === 'ACTIVE') {
-								enrolledPhones.push(
-									`${phoneNumber.substring(0, 2)}******${phoneNumber.substring(
-										8,
-										12
-									)}`
-								);
-							}
-						});
-					}
+              let item = authenticator;
 
-					const buildEnrolledPhones = () =>
-						enrolledPhones.map(phone => (
-							<List>
-								<ListItem key={phone}>{phone}</ListItem>
-							</List>
-						));
+              switch (type) {
+                case 'security_key':
+                  item = {
+                    ...item,
+                    icon: name.startsWith('Mac') ? (
+                      <Apple fontSize='small' />
+                    ) : (
+                      <Fingerprint fontSize='small' />
+                    ),
+                    value: name,
+                  };
+                  break;
+                case 'email':
+                  item = {
+                    ...item,
+                    icon: <EmailOutlined fontSize='small' />,
+                    value: profile?.email,
+                  };
+                  break;
+                case 'phone':
+                  item = {
+                    ...item,
+                    icon: key.startsWith('sms') ? (
+                      <SmsOutlined fontSize='small' />
+                    ) : (
+                      <LocalPhoneOutlined fontSize='small' />
+                    ),
+                    value: profile?.phoneNumber,
+                  };
+                  break;
+                case 'app':
+                  item = {
+                    ...item,
+                    icon: <CheckCircleOutline fontSize='small' />,
+                    value: profile?.deviceName,
+                  };
+                  break;
+                default:
+                  item = {
+                    ...item,
+                    icon: <Lock fontSize='small' />,
+                    value: name,
+                  };
+                  break;
+              }
 
-					if (enrolledPhones?.length > 0 && enrolledPhones?.length < 2) {
-						canEnroll = true;
-						setupText = 'Add Another';
-					}
-					return (
-						<Fragment>
-							<ListItem key={key} alignItems='flex-start'>
-								<ListItemIcon>
-									<Lock />
-								</ListItemIcon>
-								<ListItemText primary={factorType} secondary={provider} />
-								{canEnroll && (
-									<ListItemButton onClick={() => handleSetup(id)}>
-										{setupText}
-									</ListItemButton>
-								)}
-							</ListItem>
-						</Fragment>
-					);
-				}
-			)}
-		</List>
-	);
+              if (authenticator?.status === 'ACTIVE') {
+                enrolledAuthenticators.push(item);
+              }
+            });
+          }
+
+          const buildEnrolledAuthenticators = () =>
+            enrolledAuthenticators.map((authenticator) => (
+              <List key={`${authenticator.type}-${authenticator.id}`} disablePadding>
+                <ListItem key={authenticator.id} sx={{ pl: 4 }}>
+                  <ListItemIcon>{authenticator?.icon}</ListItemIcon>
+                  <ListItemText primary={authenticator?.value} />
+                </ListItem>
+              </List>
+            ));
+
+          if (enrolledAuthenticators?.length > 0) {
+            setupText = 'Add Another';
+          }
+
+          return (
+            <Fragment key={key}>
+              <ListItem
+                key={key}
+                alignItems='flex-start'
+                secondaryAction={
+                  <ListItemButton onClick={() => handleSetup(_id)}>{_id}</ListItemButton>
+                }
+              >
+                <ListItemText primary={name} />
+              </ListItem>
+              {buildEnrolledAuthenticators()}
+            </Fragment>
+          );
+        }
+      )}
+    </Fragment>
+  );
 };
+
+Authenticators.defaultProps = {
+  factors: [],
+};
+
+Authenticators.propTypes = {
+  factors: PropTypes.array,
+};
+
+export default Authenticators;

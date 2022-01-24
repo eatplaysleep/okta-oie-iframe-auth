@@ -1,17 +1,20 @@
 /** @format */
 
-import { Fragment } from 'react';
-import { Grid } from '@mui/material';
-import { Typography } from '../../components';
+import { React, Fragment, PropTypes } from 'globals.jsx';
+import { Grid, List, ListItem } from '@mui/material';
+import { Typography } from 'components';
 
-export const Claims = ({ data }) =>
-	data.map(attribute => (
-		<Fragment key={attribute.key}>
-			<Grid item xs={6}>
-				<Typography gutterBottom>{attribute.key}</Typography>
-			</Grid>
-			<Grid item xs={6}>
-				<Typography gutterBottom>{attribute.value}</Typography>
-			</Grid>
-		</Fragment>
-	));
+const Claims = ({ claims }) =>
+  claims.map((attribute) => (
+    <ListItem key={attribute.key} primary={attribute.key} secondary={attribute.value} />
+  ));
+
+Claims.defaultProps = {
+  claims: [],
+};
+
+Claims.propTypes = {
+  claims: PropTypes.array,
+};
+
+export default Claims;

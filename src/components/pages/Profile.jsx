@@ -1,172 +1,145 @@
 /** @format */
 import { Fragment, useEffect, useState } from 'react';
-import { Container, Grid } from '@mui/material';
-import {
-	Authenticators,
-	Claims,
-	Loader,
-	Paper,
-	Typography,
-} from '../../components';
-import { useAuthDispatch, useAuthState } from '../../providers';
+import { Container, Grid, List, ListItem, ListItemText } from '@mui/material';
+import { Authenticators, FactorModal, Loader, Paper, Typography } from 'components';
+import { useAuthDispatch, useAuthState } from 'providers';
 
-const ENV = process.env.NODE_ENV;
-const ORIGINS = process.env.REACT_APP_ORIGIN_ALLOW?.split(/, {0,2}/) || [];
+const OKTA_URL = process.env.REACT_APP_OKTA_URL;
 
 export const Profile = () => {
-	const dispatch = useAuthDispatch();
-	const {
-		user,
-		isLoadingProfile,
-		isStaleAuthenticators,
-		isLoadingAuthenticators,
-	} = useAuthState();
-	const [profile, setProfile] = useState();
-	const [authenticators, setAuthenticators] = useState();
-	const [availableFactors, setAvailableFactors] = useState();
+  const dispatch = useAuthDispatch();
+  const {
+    user,
+    factorModalIsVisible,
+    isLoadingProfile,
+    isStaleAuthenticators,
+    isLoadingAuthenticators,
+  } = useAuthState();
+  const [profile, setProfile] = useState();
+  const [authenticators, setAuthenticators] = useState();
+  const [availableFactors, setAvailableFactors] = useState();
 
-	useEffect(() => {
-		const buildProfile = () => {
-			let profile = [];
+  useEffect(() => {
+    const buildProfile = async () => {
+      let profile = [],
+        result;
 
-			for (const [key, value] of Object.entries(user)) {
-				if (key === 'address') {
-					for (const [addressKey, addressValue] of Object.entries(value)) {
-						profile.push({ key: addressKey, value: addressValue });
-					}
-				} else {
-					profile.push({ key: key, value: value });
-				}
-			}
+      for (const [key, value] of Object.entries(user)) {
+        if (key === 'address') {
+          for (const [addressKey, addressValue] of Object.entries(value)) {
+            profile.push({ key: addressKey, value: addressValue });
+          }
+        } else {
+          profile.push({ key: key, value: value });
+        }
+      }
 
-			if (profile.length > 0) {
-				return <Claims data={profile} />;
-			} else return <></>;
-		};
+      if (profile.length > 0) {
+        {
+          result = profile.map((attribute) => (
+            <ListItem key={attribute.key}>
+              <ListItemText primary={attribute.key} secondary={attribute.value} />
+            </ListItem>
+          ));
+        }
+      }
 
-		const getAvailableFactors = () => {
-			let url = `${window.location.origin}/api/${user?.sub}/factors/catalog`;
+      setProfile(() => result);
+    };
 
-			return fetch(url)
-				.then(resp => {
-					return resp.json();
-				})
-				.then(resp => {
-					if (Array.isArray(resp) && resp.length > 0) {
-						setAvailableFactors(resp);
-					}
-					return resp;
-				});
-		};
+    if (user?.updated_at) {
+      dispatch({ type: 'USER_LOADING' });
+      console.debug('building profile...');
+      buildProfile().then(() => dispatch({ type: 'USER_LOADING_SUCCESS' }));
+    }
+  }, [user?.updated_at, dispatch]);
 
-		if (user) {
-			console.log('building profile...');
-			setProfile(() => buildProfile());
-			getAvailableFactors();
-		}
-	}, [user]);
+  useEffect(() => {
+    const controller = new AbortController();
 
-	useEffect(() => {
-		const getAvailableFactors = () => {
-			let url = `${window.location.origin}/api/${user?.sub}/factors/catalog`;
+    const getIdpAuthenticators = async () => {
+      let url = `${OKTA_URL}/idp/authenticators`;
+      return fetch(url, { credentials: 'include' }).then((resp) => {
+        if (resp.ok) {
+          return resp.json();
+        }
+      });
+    };
 
-			return fetch(url)
-				.then(resp => {
-					return resp.json();
-				})
-				.then(resp => {
-					if (Array.isArray(resp) && resp.length > 0) {
-						setAvailableFactors(resp);
-					}
-					return resp;
-				});
-		};
+    const getAvailableFactors = async () => {
+      dispatch({ type: 'AUTHENTICATORS_LOADING' });
 
-		if (user && isStaleAuthenticators) {
-			getAvailableFactors().then(() =>
-				dispatch({ type: 'AUTHENTICATORS_REFRESH_SUCCESS' })
-			);
-		}
-	}, [user, isStaleAuthenticators, dispatch]);
+      let url = `${window.location.origin}/api/${user?.sub}/factors/catalog`;
 
-	useEffect(() => {
-		if (availableFactors) {
-			setAuthenticators(() => <Authenticators data={availableFactors} />);
-		}
-	}, [availableFactors]);
+      const _authenticators = await getIdpAuthenticators();
 
-	useEffect(() => {
-		const responseHandler = ({ origin, data }) => {
-			if (ENV === 'production') {
-				const isAllowed = ORIGINS.includes(origin);
+      return fetch(url, {
+        method: 'POST',
+        signal: controller.signal,
+        body: JSON.stringify(_authenticators),
+      })
+        .then((resp) => {
+          return resp.json();
+        })
+        .then((resp) => {
+          if (Array.isArray(resp) && resp.length > 0) {
+            setAvailableFactors(resp);
+          }
+          return resp;
+        })
+        .catch((err) => {
+          if (err.name === 'AbortError') {
+            console.debug('successfully aborted');
+          } else {
+            console.error(err);
+            dispatch({ type: 'FETCH_ERROR', error: err });
+          }
+        });
+    };
 
-				if (!isAllowed) {
-					return;
-				}
-			}
+    if (isStaleAuthenticators) {
+      getAvailableFactors().then(() => dispatch({ type: 'AUTHENTICATORS_REFRESH_SUCCESS' }));
+    }
 
-			if (data?.type === 'onsuccess' && data?.result === 'success') {
-				return dispatch({ type: 'REFRESH_AUTHENTICATORS' });
-			}
-		};
+    return () => controller.abort();
+  }, [isStaleAuthenticators, dispatch]);
 
-		const resolve = error => {
-			if (error) {
-				throw error;
-			}
+  useEffect(() => {
+    if (availableFactors) {
+      setAuthenticators(() => <Authenticators factors={availableFactors} />);
+    }
+  }, [availableFactors]);
 
-			console.debug('removing listener...');
-			window.removeEventListener('message', responseHandler);
-		};
-
-		if (isLoadingAuthenticators) {
-			console.debug('adding listener...');
-			window.addEventListener('message', responseHandler);
-		}
-
-		return () => resolve();
-	}, [isLoadingAuthenticators, dispatch]);
-
-	return (
-		<Fragment>
-			<Container component='section' sx={{ mt: 8, mb: 4 }}>
-				<Typography variant='h4' marked='center' align='center' component='h2'>
-					Profile
-				</Typography>
-				<Paper
-					variant='outlined'
-					sx={{ my: { xs: 3, md: 6 }, p: { xs: 2, md: 3 } }}
-				>
-					<Fragment>
-						<Typography variant='h5' gutterBottom sx={{ mt: 2 }}>
-							ATTRIBUTES
-						</Typography>
-						<Grid
-							container
-							spacing={2}
-							sx={{
-								justifyContent: 'flex-start',
-								position: 'relative',
-								minHeight: '200px',
-							}}
-						>
-							{isLoadingProfile && <Loader />}
-							{profile}
-						</Grid>
-					</Fragment>
-				</Paper>
-				<Paper
-					variant='outlined'
-					sx={{ my: { xs: 3, md: 6 }, p: { xs: 2, md: 3 } }}
-				>
-					<Fragment>
-						<Typography variant='h5' gutterBottom sx={{ mt: 2 }}>
-							AUTHENTICATORS
-						</Typography>
-						{authenticators}
-					</Fragment>
-				</Paper>
-			</Container>
-		</Fragment>
-	);
+  return (
+    <Container component='section' sx={{ mt: 8, mb: 4 }}>
+      <FactorModal open={factorModalIsVisible} onClose={() => {}} />
+      <Typography variant='h4' marked='center' align='center' component='h2'>
+        Profile
+      </Typography>
+      <Grid columns={2} spacing={3} container>
+        <Grid item md={1}>
+          <Paper variant='outlined' sx={{ my: { xs: 3, md: 6 }, p: { xs: 2, md: 3 } }}>
+            <Typography variant='h5' gutterBottom sx={{ mt: 2 }}>
+              ATTRIBUTES
+            </Typography>
+            <List disablePadding>
+              {isLoadingProfile && <Loader />}
+              {profile}
+            </List>
+          </Paper>
+        </Grid>
+        <Grid item md={1}>
+          <Paper variant='outlined' sx={{ my: { xs: 3, md: 6 }, p: { xs: 2, md: 3 } }}>
+            <Typography variant='h5' gutterBottom sx={{ mt: 2 }}>
+              AUTHENTICATORS
+            </Typography>
+            <List disablePadding>
+              {isLoadingAuthenticators && <Loader />}
+              {authenticators}
+            </List>
+          </Paper>
+        </Grid>
+      </Grid>
+    </Container>
+  );
 };

@@ -4,16 +4,16 @@ import { LoadingOverlay } from '../../components';
 import { useAuthActions, useAuthDispatch } from '../../providers';
 
 export const AppLoginCallback = () => {
-	const { login } = useAuthActions();
-	const dispatch = useAuthDispatch();
+  const { login } = useAuthActions();
+  const dispatch = useAuthDispatch();
 
-	useEffect(() => {
-		return login(dispatch);
-	}, [login, dispatch]);
+  useEffect(() => {
+    return login(dispatch);
+  }, [login, dispatch]);
 
-	return (
-		<div>
-			<LoadingOverlay open={true} />
-		</div>
-	);
+  return (
+    <div>
+      <LoadingOverlay open={true} />
+    </div>
+  );
 };

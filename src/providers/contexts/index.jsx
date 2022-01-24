@@ -1,3 +1,3 @@
 /** @format */
 
-export * from './AuthContext';
+export { default as AuthProvider, AuthStateContext } from './AuthContext';

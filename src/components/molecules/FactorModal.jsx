@@ -3,69 +3,41 @@
 import { React, useEffect, PropTypes } from 'globals.jsx';
 import { IconButton, DialogContent, DialogTitle } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { AuthDialog, Loader } from 'components';
-import { useAuthActions, useAuthDispatch, useAuthState } from 'providers';
+import { AuthDialog } from 'components';
+import { useAuthDispatch, useAuthState } from 'providers';
 
 const ENV = process.env.NODE_ENV;
 const ORIGINS = process.env.REACT_APP_ORIGIN_ALLOW?.split(/, {0,2}/) || [window.location.origin];
 
-const AuthModal = (props) => {
+const FactorModal = (props) => {
   const { onClose } = props;
   const dispatch = useAuthDispatch();
-  const { login } = useAuthActions();
-  const { authModalIsVisible, isLoadingLogin, iFrameIsVisible, authUrl, tokenParams } =
-    useAuthState();
+  const { factorModalIsVisible, factorEnrollUrl } = useAuthState();
 
   const ALLOW = process.env.REACT_APP_STEP_UP_ALLOW,
     modalWidth = '400px',
-    modalHeight = '650px';
+    modalHeight = '700px';
 
   const onCancel = () => {
-    dispatch({ type: 'LOGIN_CANCEL' });
+    dispatch({ type: 'AUTHENTICATORS_ENROLL_CANCEL' });
     return onClose();
   };
 
-  useEffect(() => {
-    console.debug('authModalIsVisible:', authModalIsVisible);
-    if (authModalIsVisible) {
-      login(dispatch);
-    }
-  }, [authModalIsVisible]);
-  useEffect(() => {
-    if (tokenParams?.authorizationCode) {
-      return login(dispatch, {
-        tokenParams,
-      });
-    }
-  }, [tokenParams]);
   useEffect(() => {
     const responseHandler = ({ origin, data }) => {
       if (ENV === 'production') {
         const isAllowed = ORIGINS.includes(origin);
         if (!isAllowed) {
           return dispatch({
-            type: 'LOGIN_ERROR',
-            payload: { iFrameIsVisible: false, authModalIsVisible: false },
+            type: 'ERROR',
+            payload: { factorModalIsVisible: false },
             error: `'origin' [${origin}] not allowed`,
           });
         }
       }
 
-      if (data?.type === 'onload' && data?.result === 'success') {
-        return dispatch({ type: 'LOGIN_STARTED' });
-      }
-
-      if (data?.code) {
-        dispatch({
-          type: 'EXCHANGE_CODE',
-          payload: {
-            tokenParams: {
-              ...tokenParams,
-              authorizationCode: data?.code,
-              interactionCode: data?.interaction_code,
-            },
-          },
-        });
+      if (data?.type === 'onsuccess' && data?.result === 'success') {
+        return dispatch({ type: 'AUTHENTICATORS_ENROLL_SUCCESS' });
       }
     };
 
@@ -78,16 +50,16 @@ const AuthModal = (props) => {
       window.removeEventListener('message', responseHandler);
     };
 
-    if (authModalIsVisible) {
+    if (factorModalIsVisible) {
       console.debug('adding listener...');
       window.addEventListener('message', responseHandler);
     }
 
     return () => resolve();
-  }, [authModalIsVisible]);
+  }, [factorModalIsVisible]);
 
   return (
-    <AuthDialog open={authModalIsVisible ?? false} onClose={onClose}>
+    <AuthDialog open={factorModalIsVisible ?? false} onClose={onClose}>
       <DialogTitle>
         <IconButton
           edge='end'
@@ -107,12 +79,11 @@ const AuthModal = (props) => {
         </IconButton>
       </DialogTitle>
       <DialogContent sx={{ width: modalWidth, height: modalHeight }}>
-        {isLoadingLogin && <Loader />}
-        {authUrl && iFrameIsVisible && (
+        {factorModalIsVisible && factorEnrollUrl && (
           <iframe
-            src={authUrl}
-            name='iframe-auth'
-            title='Login'
+            src={factorEnrollUrl}
+            name='iframe-factor-enrollment'
+            title='Factor Enrollment'
             width={modalWidth}
             height={modalHeight}
             frameBorder='0'
@@ -125,8 +96,13 @@ const AuthModal = (props) => {
   );
 };
 
-AuthModal.propTypes = {
+FactorModal.defaultProps = {
+  open: false,
+};
+
+FactorModal.propTypes = {
+  open: PropTypes.bool,
   onClose: PropTypes.func,
 };
 
-export default AuthModal;
+export default FactorModal;

@@ -16,14 +16,14 @@ import reportWebVitals from './reportWebVitals';
  */
 
 ReactDOM.render(
-	<React.StrictMode>
-		<HelmetProvider>
-			<Router>
-				<App />
-			</Router>
-		</HelmetProvider>
-	</React.StrictMode>,
-	document.getElementById('root')
+  <React.StrictMode>
+    <HelmetProvider>
+      <Router>
+        <App />
+      </Router>
+    </HelmetProvider>
+  </React.StrictMode>,
+  document.getElementById('root')
 );
 
 // Hot Module Replacement (HMR) - Remove this snippet to remove HMR.

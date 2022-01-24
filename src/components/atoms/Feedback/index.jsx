@@ -1,6 +1,6 @@
 /** @format */
 
 export * from './AuthDialog';
-export * from './Loader';
-export * from './LoadingOverlay';
-export * from './Alert';
+export { default as Loader } from './Loader';
+export { default as LoadingOverlay } from './LoadingOverlay';
+export { default as Alert } from './Alert';
