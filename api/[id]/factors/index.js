@@ -43,7 +43,6 @@ const parseFactors = async (res, { filter, enrolledAuthenticators }) => {
             name: authenticator?.name,
           })
       );
-      console.debug(authenticatorsMeta);
       body.forEach((factor) => {
         const _key = type2KeyMap[`${factor?.factorType}-${factor?.provider}`];
 
