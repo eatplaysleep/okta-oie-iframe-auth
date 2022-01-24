@@ -9,7 +9,6 @@ import {
   Fingerprint,
   LocalPhoneOutlined,
   Lock,
-  SmsOutlined,
 } from '@mui/icons-material';
 import { useAuthDispatch } from 'providers';
 
@@ -68,11 +67,7 @@ export const Authenticators = ({ factors }) => {
                 case 'phone':
                   item = {
                     ...item,
-                    icon: key.startsWith('sms') ? (
-                      <SmsOutlined fontSize='small' />
-                    ) : (
-                      <LocalPhoneOutlined fontSize='small' />
-                    ),
+                    icon: <LocalPhoneOutlined fontSize='small' />,
                     value: profile?.phoneNumber,
                   };
                   break;

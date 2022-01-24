@@ -34,36 +34,41 @@ const parseFactors = async (res, { filter, enrolledAuthenticators }) => {
 
       const { authenticators } = await getAuthenticators(true);
 
-      const authenticatorIds = {};
+      const authenticatorsMeta = {};
 
       authenticators.forEach(
         (authenticator) =>
-          (authenticatorIds[authenticatorMap[authenticator?.key]] = authenticator?.id)
+          (authenticatorsMeta[authenticator?.key] = {
+            id: authenticator?.id,
+            name: authenticator?.name,
+          })
       );
-
+      console.debug(authenticatorsMeta);
       body.forEach((factor) => {
-        const _key = `${factor?.factorType}-${factor?.provider}`;
+        const _key = type2KeyMap[`${factor?.factorType}-${factor?.provider}`];
 
-        let resp = {
-          key: _key,
-          _id: authenticatorIds[_key],
-          userId: userId,
-          name: factorMap[_key] ?? 'Unknown',
-          isRequired: factor?.enrollment === 'REQUIRED' ? true : false,
-          authenticators: enrolledAuthenticators.filter(
-            (authenticator) => _key === authenticatorMap[authenticator?.key]
-          ),
-          ...factor,
-        };
+        if (factor?.factorType !== 'call' && _key) {
+          let resp = {
+            key: _key,
+            _id: authenticatorsMeta[_key]?.id,
+            userId: userId,
+            name: authenticatorsMeta[_key]?.name,
+            isRequired: factor?.enrollment === 'REQUIRED' ? true : false,
+            authenticators: enrolledAuthenticators.filter(
+              (authenticator) => _key === authenticator?.key
+            ),
+            ...factor,
+          };
 
-        delete resp._links;
+          delete resp._links;
 
-        if (filter) {
-          if (factor?.factorType === filter?.type || factor?.status === filter?.status) {
+          if (filter) {
+            if (factor?.factorType === filter?.type || factor?.status === filter?.status) {
+              factors.push(resp);
+            }
+          } else {
             factors.push(resp);
           }
-        } else {
-          factors.push(resp);
         }
       });
       // console.log('==== parsed factors ===');
@@ -79,21 +84,13 @@ const parseFactors = async (res, { filter, enrolledAuthenticators }) => {
   }
 };
 
-const factorMap = {
-  'call-OKTA': 'Voice',
-  'email-OKTA': 'Email',
-  'push-OKTA': 'Okta Verify',
-  'sms-OKTA': 'SMS',
-  'token:software:totp-GOOGLE': 'Google Authenticator',
-  'webauthn-FIDO': 'Security Key or Biometric',
-};
-
-const authenticatorMap = {
-  google_otp: 'token:software:totp-GOOGLE',
-  okta_verify: 'push-OKTA',
-  okta_email: 'email-OKTA',
-  webauthn: 'webauthn-FIDO',
-  phone_number: 'sms-OKTA',
+const type2KeyMap = {
+  'sms-OKTA': 'phone_number',
+  'call-OKTA': 'phone_number',
+  'email-OKTA': 'okta_email',
+  'push-OKTA': 'okta_verify',
+  'token:software:totp-GOOGLE': 'google_otp',
+  'webauthn-FIDO': 'webauthn',
 };
 
 export const getAvailableFactors = async (req, res) => {
